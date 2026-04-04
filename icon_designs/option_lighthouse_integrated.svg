@@ -1,0 +1,41 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2C3E50;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4CA1AF;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Background -->
+  <rect x="0" y="0" width="200" height="200" rx="40" fill="url(#skyGradient)" />
+  
+  <!-- Lighthouse Beams -->
+  <path d="M100,60 L10,190 L190,190 Z" fill="rgba(255, 215, 0, 0.15)" />
+  <path d="M100,60 L40,190 L160,190 Z" fill="rgba(255, 215, 0, 0.25)" />
+  
+  <!-- Lighthouse Tower (Behind the symbol) -->
+  <path d="M90,190 L94,60 L106,60 L110,190 Z" fill="#FFFFFF" opacity="0.6" />
+  <rect x="88" y="50" width="24" height="12" fill="#E74C3C" /> 
+  <circle cx="100" cy="56" r="6" fill="#FFD700" filter="url(#glow)" />
+  
+  <!-- Large Wheelchair Symbol (The Focus) -->
+  <g transform="translate(100, 130)" stroke="white" stroke-width="0" fill="white">
+      <!-- Head -->
+      <circle cx="12" cy="-22" r="6" />
+      <!-- Body -->
+      <path d="M12,-12 C12,-12 0,-12 0,-12 C-5,-12 -8,-8 -8,-3 L-8,15 L-2,15 L-2,-3 C-2,-5 0,-6 4,-6 L12,-6 L12,-12 Z" />
+      <!-- Wheel -->
+      <path d="M-2,10 A 16,16 0 1,1 18,34 L14,34 A 12,12 0 1,0 2,14 L-2,10 Z" fill-rule="evenodd"/>
+      <!-- Leg -->
+      <path d="M0,15 L8,32 L16,32 L16,38 L4,38 L-6,15 Z" />
+  </g>
+  
+  <!-- Waves -->
+  <path d="M20,175 Q40,165 60,175 T100,175 T140,175 T180,175" fill="none" stroke="white" stroke-width="2" opacity="0.5" />
+</svg>

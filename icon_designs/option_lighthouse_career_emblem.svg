@@ -1,0 +1,40 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="dawnSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#FFFFFF;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect x="0" y="0" width="200" height="200" rx="45" fill="url(#dawnSky)" />
+  
+  <!-- Central Lighthouse -->
+  <path d="M85,190 L92,50 L108,50 L115,190 Z" fill="#FFFFFF" />
+  <rect x="88" y="40" width="24" height="12" fill="#FF5E62" />
+  
+  <!-- Top Light Source -->
+  <circle cx="100" cy="46" r="8" fill="#FFD700" />
+  
+  <!-- Wide Beam Downwards -->
+  <path d="M100,50 L10,190 L190,190 Z" fill="url(#halo)" />
+  
+  <!-- The Symbol in the Spotlight -->
+  <g transform="translate(60, 90)">
+      <!-- Wheelchair Person (Dark Blue for Contrast) -->
+      <g fill="#1A2A6C">
+          <circle cx="20" cy="10" r="9" /> <!-- Head -->
+          <path d="M18,22 L18,55 L52,55 L52,45 L28,45 L28,22 Z" /> <!-- Body & Leg -->
+          <rect x="28" y="24" width="22" height="9" rx="2" /> <!-- Arm -->
+          <circle cx="24" cy="55" r="16" stroke="#1A2A6C" stroke-width="7" fill="none" /> <!-- Wheel -->
+      </g>
+      
+      <!-- Character '职' (Red/Orange for Emphasis) -->
+      <text x="65" y="40" font-family="'Microsoft YaHei', sans-serif" font-weight="bold" font-size="40" fill="#E74C3C">职</text>
+  </g>
+  
+</svg>

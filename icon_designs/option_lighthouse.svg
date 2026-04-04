@@ -1,0 +1,22 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2C3E50;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4CA1AF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect x="0" y="0" width="200" height="200" rx="40" fill="url(#skyGradient)" />
+  
+  <!-- Lighthouse Beams -->
+  <path d="M100,60 L20,180 L180,180 Z" fill="rgba(255, 215, 0, 0.2)" />
+  <path d="M100,60 L60,180 L140,180 Z" fill="rgba(255, 215, 0, 0.4)" />
+  
+  <!-- Lighthouse Tower -->
+  <path d="M85,180 L92,60 L108,60 L115,180 Z" fill="#FFFFFF" />
+  <rect x="88" y="50" width="24" height="12" fill="#E74C3C" /> <!-- Top Cap -->
+  <circle cx="100" cy="56" r="4" fill="#FFD700" /> <!-- Light source -->
+  
+  <!-- Waves -->
+  <path d="M20,170 Q40,160 60,170 T100,170 T140,170 T180,170" fill="none" stroke="white" stroke-width="3" opacity="0.5" />
+</svg>

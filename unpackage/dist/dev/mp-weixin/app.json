@@ -1,0 +1,14 @@
+{
+  "pages": [
+    "pages/preview/preview",
+    "pages/index/index",
+    "pages/detail/detail"
+  ],
+  "window": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "助残公考",
+    "navigationBarBackgroundColor": "#1890ff",
+    "backgroundColor": "#f5f7fa"
+  },
+  "usingComponents": {}
+}

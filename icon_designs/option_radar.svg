@@ -1,0 +1,27 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="radarGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+      <stop offset="0%" style="stop-color:#00C6FB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#005BEA;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+  <!-- Background -->
+  <circle cx="100" cy="100" r="90" fill="url(#radarGradient)" />
+  
+  <!-- Radar Rings -->
+  <circle cx="100" cy="100" r="30" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" />
+  <circle cx="100" cy="100" r="55" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" />
+  <circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="3" />
+  
+  <!-- Radar Sweep -->
+  <path d="M100,100 L100,20 A80,80 0 0,1 180,100 z" fill="rgba(255,255,255,0.2)" transform="rotate(-45 100 100)" />
+  
+  <!-- Center Icon: Abstract Person/Accessibility -->
+  <circle cx="100" cy="85" r="10" fill="white" />
+  <path d="M85,105 Q100,120 115,105 L115,130 Q100,145 85,130 Z" fill="white" />
+  
+  <!-- Target Blip -->
+  <circle cx="140" cy="60" r="4" fill="#FFD700">
+    <animate attributeName="opacity" values="1;0;1" dur="2s" repeatCount="indefinite" />
+  </circle>
+</svg>

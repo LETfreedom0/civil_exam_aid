@@ -1,0 +1,41 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nightSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a2a6c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#b21f1f;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect x="0" y="0" width="200" height="200" rx="40" fill="#2c3e50" />
+  
+  <!-- Lighthouse -->
+  <path d="M140,180 L145,60 L155,60 L160,180 Z" fill="#ecf0f1" />
+  <rect x="142" y="50" width="16" height="10" fill="#e74c3c" />
+  
+  <!-- Beam of Light -->
+  <path d="M150,55 L20,180 L120,180 Z" fill="rgba(255, 235, 59, 0.3)" />
+  
+  <!-- Illuminated Wheelchair Symbol (Stylized) -->
+  <g transform="translate(50, 130) scale(0.8)" fill="#ffffff">
+    <circle cx="20" cy="10" r="7" /> <!-- Head -->
+    <path d="M20,20 L20,45 L45,45" stroke="#ffffff" stroke-width="6" fill="none" stroke-linecap="round"/> <!-- Body & Leg -->
+    <circle cx="25" cy="45" r="14" stroke="#ffffff" stroke-width="5" fill="none" /> <!-- Wheel -->
+  </g>
+  
+  <!-- Text hint (Optional, usually avoid in icons but helps here) -->
+  <!-- Removed text for cleaner icon look -->
+  
+  <!-- Stars -->
+  <circle cx="30" cy="30" r="2" fill="white" opacity="0.8" />
+  <circle cx="80" cy="50" r="1.5" fill="white" opacity="0.6" />
+  <circle cx="10" cy="80" r="1.5" fill="white" opacity="0.7" />
+
+</svg>

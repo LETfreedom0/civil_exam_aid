@@ -1,0 +1,38 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nightGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f2027;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#203a43;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="pathGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#FFA500;stop-opacity:0.2" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect x="0" y="0" width="200" height="200" rx="40" fill="url(#nightGradient)" />
+  
+  <!-- Lighthouse at Top -->
+  <path d="M90,60 L95,20 L105,20 L110,60 Z" fill="#FFF" />
+  <circle cx="100" cy="25" r="8" fill="#FFD700">
+     <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite" />
+  </circle>
+  
+  <!-- The Path of Light -->
+  <path d="M100,25 L20,180 L180,180 Z" fill="url(#pathGradient)" />
+  
+  <!-- The Goal: "职" floating in the light path, guiding the way -->
+  <text x="100" y="90" font-family="'Microsoft YaHei', sans-serif" font-weight="bold" font-size="40" fill="#FFF" text-anchor="middle" opacity="0.9">职</text>
+  
+  <!-- The Seeker: Wheelchair User Moving Forward (Upward) -->
+  <g transform="translate(80, 120) scale(0.8)" fill="#2c3e50">
+      <circle cx="25" cy="10" r="8" />
+      <path d="M25,22 L25,50 L55,50 L55,42 L33,42 L33,22 Z" />
+      <circle cx="25" cy="50" r="16" stroke="#2c3e50" stroke-width="6" fill="none" />
+      <!-- Add movement lines -->
+      <path d="M-5,55 L10,55" stroke="#2c3e50" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+      <path d="M50,55 L65,55" stroke="#2c3e50" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  </g>
+  
+</svg>
