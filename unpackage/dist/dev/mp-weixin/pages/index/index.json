@@ -1,7 +1,0 @@
-{
-  "navigationBarTitleText": "助残公考",
-  "navigationStyle": "custom",
-  "usingComponents": {
-    "position-card": "../../components/PositionCard"
-  }
-}
