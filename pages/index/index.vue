@@ -68,7 +68,7 @@
           v-for="item in positions" 
           :key="item.id" 
           :position="item"
-          :showStatusBadge="false"
+          :showStatusBadge="true"
           @click="goToDetail"
         />
       </view>
@@ -193,6 +193,11 @@ export default {
     calculateExamTypeCounts() {
       // 首先获取当前省份筛选后的所有数据
       let filteredByProvince = [...this.allPositions];
+      
+      // 过滤掉过时的卡片（年份小于当前年份）
+      const currentYear = new Date().getFullYear();
+      filteredByProvince = filteredByProvince.filter(p => p.year >= currentYear);
+      
       if (this.currentProvinceCode) {
         filteredByProvince = filteredByProvince.filter(p => p.province_code === this.currentProvinceCode);
       } else if (this.currentProvince) {
@@ -211,6 +216,10 @@ export default {
      */
     filterPositions() {
       let filtered = [...this.allPositions];
+      
+      // 过滤掉过时的卡片（年份小于当前年份）
+      const currentYear = new Date().getFullYear();
+      filtered = filtered.filter(p => p.year >= currentYear);
       
       // 省份筛选
       if (this.currentProvinceCode) {

@@ -1,5 +1,5 @@
 {
-    "name" : "助残公考",
+    "name" : "公考残障专岗查询",
     "appid" : "__UNI__E223603",
     "description" : "",
     "versionName" : "1.0.0",
@@ -42,7 +42,7 @@
     },
     "quickapp" : {},
     "mp-weixin" : {
-        "appid" : "wx72af273d538353bf",
+        "appid" : "wx2043ee3578306661",
         "setting" : {
             "urlCheck" : false,
             "ignoreDevUnusedFiles" : false,

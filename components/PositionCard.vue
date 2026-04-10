@@ -22,6 +22,8 @@
 </template>
 
 <script>
+import { positionService } from '@/api/positionService.js';
+
 export default {
   name: 'PositionCard',
   props: {
@@ -33,6 +35,12 @@ export default {
       type: Boolean,
       default: false
     }
+  },
+  data() {
+    return {
+      status: null,
+      statusLabel: ''
+    };
   },
   computed: {
     /**
@@ -56,21 +64,21 @@ export default {
       return 'origin-other';
     },
     /**
-     * 计算岗位状态标签文本
-     * 基于年份粗略判断：今年=报名中，未来=待开始，过去=已结束
-     */
-    statusLabel() {
-      const y = this.position?.year;
-      if (typeof y !== 'number') return '';
-      const currentYear = new Date().getFullYear();
-      if (y > currentYear) return '待开始';
-      if (y === currentYear) return '报名中';
-      return '已结束';
-    },
-    /**
      * 计算岗位状态标签样式类名
      */
     statusClass() {
+      if (this.status) {
+        const statusMap = {
+          upcoming: 'status-upcoming',
+          running: 'status-running',
+          pending: 'status-pending',
+          examined: 'status-examined',
+          scored: 'status-scored',
+          finished: 'status-finished'
+        };
+        return statusMap[this.status] || 'status-default';
+      }
+      // 回退到年份判断
       const y = this.position?.year;
       const currentYear = new Date().getFullYear();
       if (typeof y !== 'number') return 'status-default';
@@ -79,7 +87,50 @@ export default {
       return 'status-finished';
     }
   },
+  mounted() {
+    // 组件挂载时获取状态信息
+    this.fetchStatus();
+  },
   methods: {
+    /**
+     * 获取岗位状态信息
+     */
+    async fetchStatus() {
+      if (!this.position || !this.position.province_code || !this.position.year) return;
+      
+      try {
+        const category = this.position.position_origin === 1 ? 1 : 0;
+        const statusResult = await positionService.getPositionStatus(
+          this.position.province_code,
+          this.position.year,
+          category
+        );
+        this.status = statusResult.status;
+        this.statusLabel = statusResult.label;
+      } catch (e) {
+        console.error('获取职位状态失败:', e);
+        // 出错时使用年份和月份判断
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 0-11 转换为 1-12
+        if (this.position.year > currentYear) {
+          this.status = 'upcoming';
+          this.statusLabel = '待开始';
+        } else if (this.position.year === currentYear) {
+          // 当前年份：如果当前月份大于6月，认为报名已结束
+          if (currentMonth > 6) {
+            this.status = 'finished';
+            this.statusLabel = '已结束';
+          } else {
+            this.status = 'running';
+            this.statusLabel = '报名中';
+          }
+        } else {
+          this.status = 'finished';
+          this.statusLabel = '已结束';
+        }
+      }
+    },
     /**
      * 卡片点击事件：向父组件派发点击当前职位数据
      */
@@ -205,6 +256,9 @@ export default {
 }
 .status-running { background: rgba(82, 196, 26, 0.12); color: #245a1a; border-color: rgba(82, 196, 26, 0.25); }
 .status-upcoming { background: rgba(250, 140, 22, 0.12); color: #6a3a00; border-color: rgba(250, 140, 22, 0.25); }
+.status-pending { background: rgba(24, 144, 255, 0.12); color: #004085; border-color: rgba(24, 144, 255, 0.25); }
+.status-examined { background: rgba(122, 45, 213, 0.12); color: #4d0099; border-color: rgba(122, 45, 213, 0.25); }
+.status-scored { background: rgba(255, 77, 79, 0.12); color: #8a0000; border-color: rgba(255, 77, 79, 0.25); }
 .status-finished { background: rgba(0, 0, 0, 0.04); color: #8c8c8c; border-color: rgba(0, 0, 0, 0.10); }
 .status-default { background: rgba(0, 0, 0, 0.04); color: #666; border-color: rgba(0, 0, 0, 0.08); }
 </style>

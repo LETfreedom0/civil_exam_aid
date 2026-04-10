@@ -6,15 +6,44 @@
           <text class="title">{{ position.position_name }}</text>
           <view class="action-area">
             <view class="report-btn" :class="{ disabled: !canReport }" @click="canReport && (showReportModal = true)">
-              <text class="report-icon">⚠️</text>
+              <image class="report-icon" src="/static/icons/report.png" mode="aspectFill"></image>
               <text class="report-text">报错</text>
             </view>
             <view class="share-area">
               <!-- #ifdef MP-WEIXIN -->
-              <button class="share-btn" open-type="share">分享</button>
+              <button class="share-btn" open-type="share">
+                <image class="share-icon" src="/static/icons/share.png" mode="aspectFill"></image>
+                <text class="share-label">分享</text>
+              </button>
               <!-- #endif -->
               <!-- #ifndef MP-WEIXIN -->
-              <button class="share-btn" @click="sharePosition">分享</button>
+              <uni-view class="share-group" :class="{ 'share-group-hover': isShareHover }" @click="sharePosition" @touchstart="handleTouchStart" @touchend="handleTouchEnd" @touchcancel="handleTouchEnd">
+                <uni-view class="share-tooltip">
+                  <uni-view class="share-tooltip-content">
+                    <svg class="share-svg-stroke" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="9" stroke-linejoin="round"></circle>
+                      <path d="M12 3C12 3 8.5 6 8.5 12C8.5 18 12 21 12 21" stroke-linejoin="round"></path>
+                      <path d="M12 3C12 3 15.5 6 15.5 12C15.5 18 12 21 12 21" stroke-linejoin="round"></path>
+                      <path d="M3 12H21" stroke-linejoin="round"></path>
+                      <path d="M19.5 7.5H4.5" stroke-linejoin="round"></path>
+                      <g>
+                        <path d="M19.5 16.5H4.5" stroke-linejoin="round"></path>
+                      </g>
+                    </svg>
+                    <uni-text>分享职位</uni-text>
+                  </uni-view>
+                  <uni-view class="share-tooltip-arrow"></uni-view>
+                  <uni-view class="share-tooltip-overlay">
+                    <uni-view class="share-tooltip-overlay-arrow"></uni-view>
+                  </uni-view>
+                </uni-view>
+                <uni-view class="share-btn-main">
+                  <svg class="share-svg-fill" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 1024 1024">
+                    <path d="M911.6 651.6l0 209.2c0 36-30.4 66.2-66.2 66.2l-699.6 1.2c-35.8 0-65-29.2-65-65.2l1.2-699.6c0-35.8 30.4-66.2 66.2-66.2l387 0L535.2 20.2 148.2 20.2c-81.8 0-143 82.8-143 156.8l0 686c0 77.6 63 140.8 140.8 140.8l686 0c82 0 156.6-68.2 156.6-143L988.6 651.6 911.6 651.6 911.6 651.6zM730.2 60.8l288.6 289.2L730.2 639l0-165.2c0 0-286.4-31.8-453.6 206.6 0 0 52.6-454.4 453.6-454.4L730.2 60.8 730.2 60.8z" fill="#2c2c2c"></path>
+                  </svg>
+                  <uni-text class="share-btn-text">分享职位</uni-text>
+                </uni-view>
+              </uni-view>
               <!-- #endif -->
             </view>
           </view>
@@ -247,17 +276,7 @@
                         <text class="type-desc">如招聘要求、人数等</text>
                     </view>
                     
-                    <view 
-                        class="type-card" 
-                        :class="{ active: reportType === 'expired' }"
-                        @click="reportType = 'expired'"
-                    >
-                        <view class="type-icon-wrap">
-                            <text class="type-icon">⏱️</text>
-                        </view>
-                        <text class="type-name">信息过时</text>
-                        <text class="type-desc">已截止或已取消</text>
-                    </view>
+
                     
                     <view 
                         class="type-card" 
@@ -335,7 +354,8 @@ export default {
       reportType: '',
       reportDesc: '',
       submitting: false,
-      canReport: true
+      canReport: true,
+      isShareHover: false
     }
   },
   onLoad(options) {
@@ -463,6 +483,25 @@ export default {
       return age;
     }
   },
+  // 微信小程序分享配置
+  onShareAppMessage() {
+    const title = this.position?.position_name || '职位详情';
+    const id = this.currentId || this.position?.id;
+    return {
+      title: title,
+      path: `/pages/detail/detail?id=${id}`,
+      imageUrl: '/static/icons/share.png'
+    };
+  },
+  onShareTimeline() {
+    const title = this.position?.position_name || '职位详情';
+    const id = this.currentId || this.position?.id;
+    return {
+      title: title,
+      path: `/pages/detail/detail?id=${id}`,
+      imageUrl: '/static/icons/share.png'
+    };
+  },
   methods: {
     /**
      * 根据ID加载职位详情
@@ -479,7 +518,8 @@ export default {
         if (this.position) {
             // 加载时间线
             if (this.position.province_code && this.position.year) {
-                this.timeline = await positionService.getExamTimeline(this.position.province_code, this.position.year);
+                const category = this.position.position_origin === 1 ? 1 : 0;
+                this.timeline = await positionService.getExamTimeline(this.position.province_code, this.position.year, category);
             }
         } else {
             this.errorMsg = '未找到该职位信息';
@@ -495,6 +535,18 @@ export default {
         if (this.currentId) {
             this.loadData(this.currentId);
         }
+    },
+    /**
+     * 触摸开始事件处理
+     */
+    handleTouchStart() {
+      this.isShareHover = true;
+    },
+    /**
+     * 触摸结束事件处理
+     */
+    handleTouchEnd() {
+      this.isShareHover = false;
     },
     /**
      * 拨打咨询电话
@@ -697,8 +749,10 @@ export default {
       border: 1rpx solid #ffa39e;
       
       .report-icon {
-        font-size: 24rpx;
+        width: 24rpx;
+        height: 24rpx;
         margin-right: 6rpx;
+        vertical-align: middle;
       }
       
       .report-text {
@@ -860,22 +914,159 @@ export default {
 }
 
 .share-btn {
-  font-size: 24rpx;
-  color: #666;
-  background: #f5f7fa;
-  padding: 0 24rpx;
-  height: 48rpx;
-  line-height: 48rpx;
-  border-radius: 24rpx;
-  border: 1px solid #eee;
+  font-size: 24rpx !important;
+  color: #666 !important;
+  background: #f5f7fa !important;
+  padding: 0 24rpx !important;
+  height: 48rpx !important;
+  line-height: 48rpx !important;
+  border-radius: 24rpx !important;
+  border: 1px solid #eee !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8rpx !important;
+  min-width: 120rpx !important;
   
   &::after {
-    border: none;
+    border: none !important;
   }
   
   &:active {
-    background: #e6e6e6;
+    background: #e6e6e6 !important;
   }
+}
+
+.share-icon {
+  width: 28rpx;
+  height: 28rpx;
+  vertical-align: middle;
+}
+
+.share-btn svg {
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+}
+
+.share-label {
+  font-size: 24rpx;
+  color: #666;
+  vertical-align: middle;
+}
+
+/* New share button styles */
+.share-group {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #525252;
+  font-size: 14rpx;
+  font-weight: bold;
+}
+
+.share-tooltip {
+  position: absolute;
+  opacity: 0;
+  transform: translateY(-300%) skewY(20deg);
+  transition: all 500ms ease;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.share-group-hover .share-tooltip {
+  opacity: 1;
+  transform: translateY(-150%) skewY(0);
+  transition-delay: 500ms;
+}
+
+.share-tooltip-content {
+  background-color: #dcfce7;
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  padding: 8rpx;
+  border-radius: 8rpx;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.share-svg-stroke {
+  stroke: #525252;
+}
+
+.share-svg-fill {
+  fill: #525252;
+  width: 20px;
+  height: 20px;
+}
+
+.share-tooltip-arrow {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background-color: #dcfce7;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(100%) translateY(50%) rotate(45deg);
+  padding: 4rpx;
+}
+
+.share-tooltip-overlay {
+  border-radius: 8rpx;
+  background-color: #ffffff;
+  opacity: 1;
+  transform: scale(1);
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: all 500ms ease;
+  transition-delay: 0;
+  pointer-events: none;
+}
+
+.share-group-hover .share-tooltip-overlay {
+  opacity: 0;
+  transform: scale(1.15);
+  transition-delay: 700ms;
+}
+
+.share-tooltip-overlay-arrow {
+  border-bottom: 1rpx solid #ffffff;
+  border-right: 1rpx solid #ffffff;
+  background-color: #ffffff;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(100%) translateY(50%) rotate(45deg);
+  padding: 4rpx;
+}
+
+.share-btn-main {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  background: linear-gradient(135deg, #dcfce7, #fef9c3);
+  padding: 12rpx;
+  border-radius: 9999rpx;
+  cursor: pointer;
+  transition: all 300ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.share-group-hover .share-btn-main {
+  gap: 8rpx;
+}
+
+.share-btn-text {
+  font-size: 0;
+  transition: font-size 300ms ease;
+}
+
+.share-group-hover .share-btn-text {
+  font-size: 14rpx;
 }
 
 .step-item {
@@ -1236,57 +1427,65 @@ export default {
     .type-grid {
         display: flex;
         flex-wrap: wrap;
-        gap: 16rpx;
+        gap: 24rpx;
         margin-bottom: 32rpx;
+        justify-content: space-between;
         
         .type-card {
-            width: 47%;
+            width: calc(33.33% - 16rpx);
             background: #f7f8fa;
-            border-radius: 16rpx;
-            padding: 24rpx 12rpx;
+            border-radius: 20rpx;
+            padding: 32rpx 20rpx;
             text-align: center;
             border: 2rpx solid transparent;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
             box-sizing: border-box;
+            box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
             
             &:active {
-                transform: scale(0.97);
+                transform: scale(0.95);
                 background: #f0f1f4;
+                box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.1);
             }
             
             &.active {
                 background: #e6f7ff;
                 border-color: #1890ff;
+                box-shadow: 0 4rpx 12rpx rgba(24, 144, 255, 0.2);
                 
                 .type-icon-wrap {
                     background: #1890ff;
+                    box-shadow: 0 2rpx 8rpx rgba(24, 144, 255, 0.3);
                 }
             }
             
             .type-icon-wrap {
-                width: 60rpx;
-                height: 60rpx;
+                width: 72rpx;
+                height: 72rpx;
                 background: #e8e8e8;
-                border-radius: 14rpx;
-                font-size: 30rpx;
+                border-radius: 16rpx;
+                font-size: 36rpx;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                margin-bottom: 10rpx;
+                margin-bottom: 16rpx;
+                transition: all 0.3s ease;
             }
             
             .type-name {
-                font-size: 26rpx;
+                font-size: 28rpx;
                 font-weight: 600;
                 color: #333;
                 display: block;
-                margin-bottom: 4rpx;
+                margin-bottom: 8rpx;
+                line-height: 1.3;
             }
             
             .type-desc {
-                font-size: 20rpx;
+                font-size: 22rpx;
                 color: #999;
                 display: block;
+                line-height: 1.4;
             }
         }
     }
