@@ -1,0 +1,47 @@
+# 残疾人公考岗位 · 数据源清单
+#
+# 字段说明：
+#   id             唯一标识（短横线小写，如 gx-rsks）
+#   province_code  省份代码（见 common/provinces.json）
+#   name           数据源名称（如 广西人事考试网）
+#   kind           announcement=官网公告列表页 / excel=手工维护的附件 / manual=纯人工录入
+#   enabled        true 才会被采集；新省配置好后先 dry-run 再放开
+#   year           考录年度（默认当前年）
+#   category       考试类别：0省考 1事业单位 2国考 3其他
+#   list_url       公告列表页地址（kind=manual 时不需要）
+#   field_mapping  Excel 表头 → positions 字段；逐省各不相同，必须实际下载一份表格核对
+
+sources:
+  # ------------------------------------------------------------------
+  # 示例：手工录入占位（已启用，验证流水线连通性用）
+  # ------------------------------------------------------------------
+  - id: manual-demo
+    province_code: "450000"
+    name: 示例手工数据源
+    kind: manual
+    enabled: true
+    year: 2026
+    category: 0
+
+  # ------------------------------------------------------------------
+  # 示例：官网采集（未启用）。放开前请：
+  #   1. 打开 list_url 确认页面能访问
+  #   2. 下载一份真实岗位表，核对 Excel 表头再写 field_mapping
+  #   3. python scripts/scrape.py --dry-run 验证
+  # ------------------------------------------------------------------
+  # - id: gx-rsks
+  #   province_code: "450000"
+  #   name: 广西人事考试网
+  #   kind: announcement
+  #   enabled: false
+  #   year: 2026
+  #   category: 0
+  #   list_url: https://www.gxpta.com.cn/xxx/   # TODO: 填真实公告栏目地址
+  #   field_mapping:
+  #     职位名称: position_name
+  #     招录机关: recruit_unit
+  #     职位代码: job_code
+  #     招录人数: quota
+  #     学历要求: education
+  #     专业要求: major
+  #     其他条件: other_requirements
