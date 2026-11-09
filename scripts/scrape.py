@@ -22,11 +22,28 @@ import hashlib
 import os
 import pathlib
 import re
+import socket
 import sys
 import tempfile
 
 import requests
 import yaml
+
+# ---------------------------------------------------------------------------
+# 强制 IPv4：部分境内考试网站返回 AAAA 记录，而 GitHub Actions 服务器无 IPv6，
+# 默认先试 IPv6 会报 "Network is unreachable"。过滤掉 AAAA，让请求直接走 IPv4。
+# ---------------------------------------------------------------------------
+_orig_getaddrinfo = socket.getaddrinfo
+
+def _ipv4_first_getaddrinfo(*args, **kwargs):
+    try:
+        results = _orig_getaddrinfo(*args, **kwargs)
+    except socket.gaierror:
+        raise
+    ipv4 = [ai for ai in results if ai[0] == socket.AF_INET]
+    return ipv4 if ipv4 else results
+
+socket.getaddrinfo = _ipv4_first_getaddrinfo
 
 ROOT = pathlib.Path(__file__).resolve().parent
 SOURCES_FILE = ROOT / "sources.yaml"
