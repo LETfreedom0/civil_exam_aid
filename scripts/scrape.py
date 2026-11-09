@@ -19,6 +19,7 @@
 import argparse
 import datetime as dt
 import hashlib
+import json
 import os
 import pathlib
 import re
@@ -76,9 +77,12 @@ def sb_get(table, params):
     return r.json()
 
 
-def sb_post(table, rows, params=None):
+def sb_post(table, rows, params=None, prefer=None):
+    headers = sb_headers()
+    if prefer:
+        headers["Prefer"] = prefer
     r = requests.post(f"{SB_URL}/rest/v1/{table}", params=params or {},
-                      json=rows, headers=sb_headers(), timeout=TIMEOUT)
+                      json=rows, headers=headers, timeout=TIMEOUT)
     if r.status_code >= 300:
         raise RuntimeError(f"Supabase 写入 {table} 失败: {r.status_code} {r.text[:300]}")
     return r
@@ -241,9 +245,9 @@ def record_notice(url, title, source_id):
 
 
 def upsert_positions(rows):
-    """依赖 v2 迁移中 positions(job_code, exam_year) 的唯一约束。"""
+    """按 external_key 幂等写入（PostgREST upsert 需要 Prefer 头）。"""
     params = {"on_conflict": "external_key"}
-    sb_post(TABLE, rows, params)
+    sb_post(TABLE, rows, params, prefer="resolution=merge-duplicates")
 
 
 def write_run_log(source_id, summary, affected):
@@ -272,10 +276,62 @@ def mark_expired():
 # 主流程
 # ---------------------------------------------------------------------------
 
+def collect_source_rows(src):
+    """抓取并解析一个数据源。返回 (links, rows_by_url)。
+
+    rows_by_url[url] 是该附件解析出的岗位行列表；解析失败的附件不进字典。
+    attachments（links）供导入端写 notices 去重。
+    境内考试网站屏蔽境外 IP（gxpta 实测），抓取必须在境内网络执行——
+    GitHub Actions 只负责导入，见 --export 与 scripts/import_data.py。
+    """
+    links = fetch_announcement_links(src)
+    print(f"[{src['id']}] 发现 {len(links)} 个附件。")
+    rows_by_url = {}
+    for link in links:
+        try:
+            rows = []
+            for raw in parse_attachment(link["url"]):
+                row = map_row(raw, src)
+                if row.get("position_name") or row.get("position_code"):
+                    rows.append(row)
+            rows_by_url[link["url"]] = rows
+        except Exception as e:  # 单个附件失败不中断整省
+            print(f"[{src['id']}] 附件处理失败 {link['url']}: {e}")
+    return links, rows_by_url
+
+
+def export_sources(enabled, out_path):
+    """只抓取并导出 JSON（不连 Supabase）。导入由 GitHub Actions 完成。"""
+    sources_payload = []
+    for src in enabled:
+        if src["kind"] == "manual":
+            continue
+        links, rows_by_url = collect_source_rows(src)
+        sources_payload.append({
+            "id": src["id"],
+            "province_code": src["province_code"],
+            "list_url": src.get("list_url"),
+            "attachments": [{"url": l["url"], "title": l["title"]} for l in links],
+            "rows": [r for rows in rows_by_url.values() for r in rows],
+        })
+    payload = {
+        "exported_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "sources": sources_payload,
+    }
+    pathlib.Path(out_path).write_text(
+        json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+    )
+    total = sum(len(s["rows"]) for s in sources_payload)
+    print(f"\n[export] 已导出 {total} 条到 {out_path}，接下来执行 scripts/push_data.py 推送导入。")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="残疾人公考岗位采集")
     parser.add_argument("--dry-run", action="store_true",
                         help="只校验配置与数据源连通性，不写 Supabase")
+    parser.add_argument("--export", metavar="PATH",
+                        help="只抓取并导出 JSON（不连 Supabase），境内网络抓取用")
     args = parser.parse_args()
 
     sources = load_sources()
@@ -296,6 +352,10 @@ def main():
         print("\n[dry-run] 配置校验通过，未写入 Supabase。")
         return 0
 
+    # 导出模式：境内抓取端使用，不需要 Supabase 凭据
+    if args.export:
+        return export_sources(enabled, args.export)
+
     if not SB_URL or not SB_SERVICE_KEY:
         print("缺少环境变量 SB_URL / SB_SERVICE_KEY（在仓库 Settings → Secrets 配置）。")
         return 1
@@ -306,21 +366,13 @@ def main():
             print(f"[{src['id']}] manual 数据源，跳过自动抓取。")
             continue
         try:
-            links = fetch_announcement_links(src)
-            print(f"[{src['id']}] 发现 {len(links)} 个附件。")
+            links, rows_by_url = collect_source_rows(src)
             new_rows = []
             for link in links:
                 if is_notice_seen(link["url"]):
                     continue
-                try:
-                    for raw in parse_attachment(link["url"]):
-                        row = map_row(raw, src)
-                        if row.get("position_name") or row.get("job_code"):
-                            new_rows.append(row)
-                    record_notice(link["url"], link["title"], src["id"])
-                except Exception as e:  # 单个附件失败不中断整省
-                    print(f"[{src['id']}] 附件处理失败 {link['url']}: {e}")
-
+                new_rows.extend(rows_by_url.get(link["url"], []))
+                record_notice(link["url"], link["title"], src["id"])
             if new_rows:
                 upsert_positions(new_rows)
             write_run_log(src["id"], f"采集 {len(new_rows)} 条", len(new_rows))

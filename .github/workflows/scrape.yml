@@ -1,12 +1,12 @@
 name: scrape
 
-# 残疾人公考岗位采集流水线
-# 文档方案：GitHub Actions 定时采集 → 解析 → upsert Supabase → run_log 记录
+# 【已废弃定时采集】境内考试网站屏蔽境外 IP（gxpta.com.cn 实测
+# Connection timed out / Network unreachable），GitHub Actions 无法直接抓取。
+# 新流程：本地 python scripts/push_data.py 抓取并 push data/*.json
+#        → 自动触发 import 工作流写入 Supabase。
+# 本工作流仅保留手动触发，用于校验 sources.yaml 配置（dry-run）。
 
 on:
-  schedule:
-    # UTC 22:00 = 北京时间每天 06:00
-    - cron: "0 22 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
