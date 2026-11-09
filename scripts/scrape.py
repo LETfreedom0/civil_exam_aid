@@ -245,9 +245,22 @@ def record_notice(url, title, source_id):
 
 
 def upsert_positions(rows):
-    """按 external_key 幂等写入（PostgREST upsert 需要 Prefer 头）。"""
+    """按 external_key 幂等写入（PostgREST upsert 需要 Prefer 头）。
+
+    PostgREST 要求同一批 POST 的所有对象键完全一致（PGRST102），
+    所以先取所有行的键并集，缺列补 null 再发送。
+    """
+    if not rows:
+        return
+    keys, seen = [], set()
+    for r in rows:
+        for k in r.keys():
+            if k not in seen:
+                seen.add(k)
+                keys.append(k)
+    normalized = [{k: r.get(k) for k in keys} for r in rows]
     params = {"on_conflict": "external_key"}
-    sb_post(TABLE, rows, params, prefer="resolution=merge-duplicates")
+    sb_post(TABLE, normalized, params, prefer="resolution=merge-duplicates")
 
 
 def write_run_log(source_id, summary, affected):
