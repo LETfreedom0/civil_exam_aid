@@ -116,6 +116,9 @@ def fetch_announcement_links(source):
     import urllib.parse
     resp = requests.get(source["list_url"], headers=UA, timeout=TIMEOUT)
     resp.raise_for_status()
+    # requests 在响应头未标明编码时默认按 ISO-8859-1 解，中文页面会乱码
+    if not resp.encoding or resp.encoding.lower() in ("iso-8859-1", "latin-1"):
+        resp.encoding = resp.apparent_encoding or "utf-8"
     text = resp.text
     base = resp.url
 
@@ -131,7 +134,12 @@ def fetch_announcement_links(source):
 
 
 def parse_attachment(url):
-    """下载附件并解析为原始行。v0 仅支持 Excel；PDF 解析接入 pdfplumber 后放开。"""
+    """下载附件并解析为原始行。
+
+    支持多 sheet 工作簿（如广西职位表：区直 + 14 个设区市各一个 sheet），
+    每个 sheet 的名字会附加到每行的 _sheet 字段，供 map_row 写入 city。
+    v0 仅支持 Excel；PDF 解析接入 pdfplumber 后放开。
+    """
     import pandas as pd
 
     with tempfile.NamedTemporaryFile(suffix=pathlib.Path(url).suffix,
@@ -141,8 +149,13 @@ def parse_attachment(url):
         tmp.write(r.content)
         path = tmp.name
     try:
-        df = pd.read_excel(path)
-        return df.to_dict(orient="records")
+        sheets = pd.read_excel(path, sheet_name=None)  # {sheet名: df}
+        rows = []
+        for sheet_name, df in sheets.items():
+            for raw in df.to_dict(orient="records"):
+                raw["_sheet"] = str(sheet_name).strip()
+                rows.append(raw)
+        return rows
     finally:
         os.unlink(path)
 
@@ -150,18 +163,32 @@ def parse_attachment(url):
 def map_row(raw, source):
     """Excel 中文表头 → positions 字段。
 
-    field_mapping 在 sources.yaml 中按数据源配置；缺失映射的行记 warning 并跳过。
+    field_mapping 在 sources.yaml 中按数据源配置。
+    类型处理：quota 转整数；其余转字符串并去空白；空值跳过。
     """
     mapping = source.get("field_mapping") or {}
     row = {}
     for excel_col, field in mapping.items():
         value = raw.get(excel_col)
-        if value is not None and str(value).strip() != "":
-            row[field] = str(value).strip()
+        if value is None or (isinstance(value, float) and value != value):  # NaN
+            continue
+        text = str(value).strip()
+        if text == "":
+            continue
+        if field == "quota":
+            try:
+                row[field] = int(float(text))
+                continue
+            except ValueError:
+                pass  # 非纯数字时按原文保留
+        row[field] = text
     row["province_code"] = source["province_code"]
     row["year"] = int(source.get("year", TODAY.year))
     row["position_origin"] = int(source.get("category", 0))
     row["source_id"] = source.get("id")
+    sheet = raw.get("_sheet")
+    if sheet and sheet != "nan":
+        row["city"] = sheet
     return row
 
 

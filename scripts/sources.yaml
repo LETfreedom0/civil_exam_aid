@@ -4,16 +4,59 @@
 #   id             唯一标识（短横线小写，如 gx-rsks）
 #   province_code  省份代码（见 common/provinces.json）
 #   name           数据源名称（如 广西人事考试网）
-#   kind           announcement=官网公告列表页 / excel=手工维护的附件 / manual=纯人工录入
+#   kind           announcement=官网公告页（含附件）/ excel=手工维护的附件 / manual=纯人工录入
 #   enabled        true 才会被采集；新省配置好后先 dry-run 再放开
 #   year           考录年度（默认当前年）
 #   category       考试类别：0省考 1事业单位 2国考 3其他
-#   list_url       公告列表页地址（kind=manual 时不需要）
+#   list_url       公告页地址（kind=manual 时不需要）
 #   field_mapping  Excel 表头 → positions 字段；逐省各不相同，必须实际下载一份表格核对
+#
+# 新增省份流程：
+#   1. 打开 list_url 确认公告页能访问、附件是 xlsx/xls
+#   2. 下载一份真实岗位表，核对 Excel 表头再写 field_mapping
+#   3. python scripts/scrape.py --dry-run 验证
+#   4. enabled 改为 true
 
 sources:
   # ------------------------------------------------------------------
-  # 示例：手工录入占位（已启用，验证流水线连通性用）
+  # 广西壮族自治区 2026 年度考试录用公务员（已按真实表格核对表头）
+  #   公告页: gxpta.com.cn 2026 公务员专题 → 招考公告 t13229.html
+  #   附件:   职位计划表.xlsx，15 个 sheet（区直 + 14 个设区市），表头在第 1 行
+  #   实测:   全区 3358 条，其中"面向残疾人招考"2 条（玉林/来宾，残疾类别与
+  #           等级写在"其他"列，如"三、四级肢体、视力及听力类残疾人"）
+  #   注意:   "职位类别"列（A/B/C 类）决定申论卷型，映射到 essay_subject
+  # ------------------------------------------------------------------
+  - id: gx-rsks-2026
+    province_code: "450000"
+    name: 广西人事考试网·2026年度公务员
+    kind: announcement
+    enabled: true
+    year: 2026
+    category: 0
+    list_url: https://www.gxpta.com.cn/ksxm/gwyzlks/gx2026ndkslygwyxdszt/2026ngwygg/t13229.html
+    field_mapping:
+      招录机关: recruit_unit          # 招录机关（单位名称）
+      机构层级: unit_level            # 自治区级/市级/县级/乡镇级
+      系统属性: position_nature       # 党群/公安等系统
+      职位名称: position_name
+      职位代码: position_code
+      职位类别: essay_subject         # A/B/C 类 → 申论卷型
+      职位招考对象: candidate_identity  # 不限/面向残疾人招考/面向高校毕业生退役军人招考
+      招考人数: quota                 # 整数
+      职位简介: description
+      专业（学科）类别: major          # 注意全角括号
+      学历: education
+      学位: degree
+      年龄: max_age
+      是否要求具有2年以上基层工作经历: grassroots_exp
+      是否要求应届毕业生: fresh_grad
+      其他: other_requirements        # 含性别要求、证书要求、残疾人类别等级等关键信息
+      资格审查咨询电话1: phone1
+      资格审查咨询电话2: phone2
+    # sheet 名（区直/南宁/柳州…）会写入 city 字段，无需在此配置
+
+  # ------------------------------------------------------------------
+  # 手工录入占位（验证流水线连通性用，不产生抓取动作）
   # ------------------------------------------------------------------
   - id: manual-demo
     province_code: "450000"
@@ -22,26 +65,3 @@ sources:
     enabled: true
     year: 2026
     category: 0
-
-  # ------------------------------------------------------------------
-  # 示例：官网采集（未启用）。放开前请：
-  #   1. 打开 list_url 确认页面能访问
-  #   2. 下载一份真实岗位表，核对 Excel 表头再写 field_mapping
-  #   3. python scripts/scrape.py --dry-run 验证
-  # ------------------------------------------------------------------
-  # - id: gx-rsks
-  #   province_code: "450000"
-  #   name: 广西人事考试网
-  #   kind: announcement
-  #   enabled: false
-  #   year: 2026
-  #   category: 0
-  #   list_url: https://www.gxpta.com.cn/xxx/   # TODO: 填真实公告栏目地址
-  #   field_mapping:
-  #     职位名称: position_name
-  #     招录机关: recruit_unit
-  #     职位代码: job_code
-  #     招录人数: quota
-  #     学历要求: education
-  #     专业要求: major
-  #     其他条件: other_requirements
