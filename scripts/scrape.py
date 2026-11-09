@@ -207,7 +207,8 @@ def map_row(raw, source):
     row["province_code"] = source["province_code"]
     row["year"] = int(source.get("year", TODAY.year))
     row["position_origin"] = int(source.get("category", 0))
-    row["source_id"] = source.get("id")
+    # 注意：positions.source_id 是 bigint（指向 data_sources.id），
+    # 不能放字符串源 id；源信息由 notices / run_log 记录。
     sheet = raw.get("_sheet")
     if sheet and sheet != "nan":
         row["city"] = sheet
