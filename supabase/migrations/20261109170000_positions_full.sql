@@ -5,7 +5,7 @@
 --   2. 之后是「原表漏掉 / 线上后补」的系统字段（8 列）
 --   3. 最后是「残疾人适配」块（4 列，扁平化自 position_disability，便于单表筛选）
 --      与「多群体 / 溯源」块（4 列）
--- 存量数据：从 positions + position_disability 全量回填，原表只读不动
+-- 存量数据：不回填（存量保留在 positions），只建结构
 -- =============================================================================
 
 create table if not exists public.positions_full (
@@ -89,49 +89,11 @@ create table if not exists public.positions_full (
 );
 
 -- -----------------------------------------------------------------------------
--- 存量数据回填：positions 左联 position_disability，残疾信息扁平化
+-- 注意：本表只建结构，不回填存量数据（存量保留在 positions）。
+-- 待切换主表时再执行数据迁移，届时可参考：
+--   insert into public.positions_full (...) select ... from public.positions p
+--   left join public.position_disability pd on pd.position_id = p.id;
 -- -----------------------------------------------------------------------------
-insert into public.positions_full (
-  id, exam_region, recruit_unit, unit_level, position_name, position_code,
-  position_nature, exam_subjects, quota, candidate_identity, grassroots_exp,
-  gender, max_age, education, degree, major, domicile, certification,
-  other_requirements, min_service_years, exam_ratio, physical_test_standards,
-  medical_test_standards, phone1, phone2, region_dept, position_type,
-  rank_level, political_status, fresh_grad, fresh_grad_year, exam_type,
-  essay_subject, police_subject, legal_knowledge, physical_test, is_set,
-  test_ratio, interview_ratio, inspection_ratio, description, year, city,
-  province_code, position_origin,
-  phone, source_id, announcement_id, cycle_id, education_min_code, raw_payload,
-  is_active, created_at, updated_at,
-  is_disability_only, disability_types, allowed_levels, disability_source_text,
-  audience_tags, remote_area, source_url, external_key
-)
-select
-  p.id, p.exam_region, p.recruit_unit, p.unit_level, p.position_name, p.position_code,
-  p.position_nature, p.exam_subjects, p.quota, p.candidate_identity, p.grassroots_exp,
-  p.gender, p.max_age, p.education, p.degree, p.major, p.domicile, p.certification,
-  p.other_requirements, p.min_service_years, p.exam_ratio, p.physical_test_standards,
-  p.medical_test_standards, p.phone1, p.phone2, p.region_dept, p.position_type,
-  p.rank_level, p.political_status, p.fresh_grad, p.fresh_grad_year, p.exam_type,
-  p.essay_subject, p.police_subject, p.legal_knowledge, p.physical_test, p.is_set,
-  p.test_ratio, p.interview_ratio, p.inspection_ratio, p.description, p.year, p.city,
-  p.province_code, p.position_origin,
-  p.phone, p.source_id, p.announcement_id, p.cycle_id, p.education_min_code, p.raw_payload,
-  p.is_active, p.created_at, p.updated_at,
-  p.is_disability_only,
-  coalesce(pd.disability_types,
-           case when p.is_disability_only then array['unspecified']::text[] end),
-  pd.allowed_levels,
-  coalesce(pd.source_text,
-           case when p.is_disability_only then left(coalesce(p.other_requirements,''), 200) end),
-  p.audience_tags, p.remote_area, p.source_url, p.external_key
-from public.positions p
-left join public.position_disability pd on pd.position_id = p.id
-on conflict (id) do nothing;
-
--- 回填后把序列推进到最大 id 之后，避免后续插入主键冲突
-select setval(pg_get_serial_sequence('public.positions_full', 'id'),
-              coalesce((select max(id) from public.positions_full), 1));
 
 -- -----------------------------------------------------------------------------
 -- 索引：查询路径全部走索引
