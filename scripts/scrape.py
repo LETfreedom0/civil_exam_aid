@@ -18,6 +18,7 @@
 
 import argparse
 import datetime as dt
+import hashlib
 import os
 import pathlib
 import re
@@ -189,6 +190,13 @@ def map_row(raw, source):
     sheet = raw.get("_sheet")
     if sheet and sheet != "nan":
         row["city"] = sheet
+    # 幂等键：省份|年份|职位代码|单位|职位名 的哈希（线上实测职位代码省内可能重号）
+    key_src = "|".join([
+        source["province_code"], str(row["year"]),
+        str(row.get("position_code") or ""), str(row.get("recruit_unit") or ""),
+        str(row.get("position_name") or ""),
+    ])
+    row["external_key"] = hashlib.md5(key_src.encode("utf-8")).hexdigest()
     return row
 
 
@@ -217,7 +225,7 @@ def record_notice(url, title, source_id):
 
 def upsert_positions(rows):
     """依赖 v2 迁移中 positions(job_code, exam_year) 的唯一约束。"""
-    params = {"on_conflict": "job_code,exam_year"}
+    params = {"on_conflict": "external_key"}
     sb_post(TABLE, rows, params)
 
 
