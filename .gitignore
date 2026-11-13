@@ -34,3 +34,6 @@ admin/tsconfig.tsbuildinfo
 
 # Raw downloaded source data (re-fetchable via scripts/scrape.py)
 data/
+
+# Supabase CLI cache
+supabase/.temp/
