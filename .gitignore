@@ -20,3 +20,17 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local secrets & env
+.env*
+admin/.env*
+
+# WorkBuddy workspace internal
+.workbuddy/
+
+# Next.js build
+admin/.next/
+admin/tsconfig.tsbuildinfo
+
+# Raw downloaded source data (re-fetchable via scripts/scrape.py)
+data/

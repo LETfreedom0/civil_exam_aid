@@ -1,0 +1,48 @@
+name: import
+
+# 云端导入：data/*.json（境内抓取端 push 上来）→ 写 Supabase → notices/run_log
+# 抓取在境内网络执行（scripts/push_data.py），supabase.co 只能从境外访问，
+# 所以两段拆开，仓库 data/ 目录是中转。
+
+on:
+  push:
+    paths:
+      - "data/*.json"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      SB_URL: ${{ secrets.SB_URL }}
+      SB_SERVICE_KEY: ${{ secrets.SB_SERVICE_KEY }}
+      SB_TABLE: positions_full
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: 安装依赖
+        run: pip install -r scripts/requirements.txt
+
+      - name: 导入数据
+        run: python scripts/import_data.py
+
+      - name: 失败告警提示
+        if: failure()
+        run: |
+          echo "::error::导入失败。请检查：1) Secrets 是否配置 SB_URL / SB_SERVICE_KEY；2) Actions 日志中 import_data.py 的输出；3) data/*.json 内容是否完整（推送是否被截断）。"

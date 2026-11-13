@@ -1,0 +1,57 @@
+name: scrape
+
+# 【已废弃定时采集】境内考试网站屏蔽境外 IP（gxpta.com.cn 实测
+# Connection timed out / Network unreachable），GitHub Actions 无法直接抓取。
+# 新流程：本地 python scripts/push_data.py 抓取并 push data/*.json
+#        → 自动触发 import 工作流写入 Supabase。
+# 本工作流仅保留手动触发，用于校验 sources.yaml 配置（dry-run）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "只校验配置与数据源连通性，不写入 Supabase"
+        required: false
+        default: "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      SB_URL: ${{ secrets.SB_URL }}
+      SB_SERVICE_KEY: ${{ secrets.SB_SERVICE_KEY }}
+      SB_TABLE: positions
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: 安装依赖
+        run: pip install -r scripts/requirements.txt
+
+      - name: 运行采集
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            python scripts/scrape.py --dry-run
+          else
+            python scripts/scrape.py
+          fi
+
+      - name: 失败告警提示
+        if: failure()
+        run: |
+          echo "::error::采集失败。请检查：1) 仓库 Settings → Secrets 是否已配置 SB_URL / SB_SERVICE_KEY；2) 数据源站点是否改版（scripts/sources.yaml）；3) Actions 日志中各步骤输出。"

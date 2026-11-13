@@ -1,0 +1,9 @@
+{
+  "name": "gwy-api",
+  "version": "1.0.0",
+  "description": "公务员岗位查询 API：岗位列表/详情/时间线/统计/反馈上报",
+  "main": "index.js",
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
+}

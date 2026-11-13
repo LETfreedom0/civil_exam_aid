@@ -1,0 +1,9 @@
+{
+  "name": "cloudbase_auth",
+  "version": "1.0.0",
+  "description": "weixin cloud env sharing auth function",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

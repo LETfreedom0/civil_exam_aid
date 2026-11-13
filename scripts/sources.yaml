@@ -1,0 +1,2327 @@
+# 残疾人公考岗位 · 数据源清单
+#
+# 字段说明：
+#   id             唯一标识（短横线小写，如 gx-rsks）
+#   province_code  省份代码（见 common/provinces.json）
+#   name           数据源名称（如 广西人事考试网）
+#   kind           announcement=官网公告页（含附件）/ excel=手工维护的附件 / manual=纯人工录入
+#   enabled        true 才会被采集；新省配置好后先 dry-run 再放开
+#   year           考录年度（默认当前年）
+#   category       考试类别：0省考 1事业单位 2国考 3其他
+#   list_url       公告页地址（kind=manual 时不需要）
+#   field_mapping  Excel 表头 → positions 字段；逐省各不相同，必须实际下载一份表格核对
+#
+# 可选字段（复杂站点用）：
+#   header_row            表头起始行（0 基），默认 0。实际由 _detect_header_row 自动定位，
+#                         这里只是兜底：跳不过「附件1」「XX省…职位表」这类合并单元格标题行
+#   sheet_as_city         sheet 名写入 city（默认 true）。sheet 是职位类别时置 false
+#   sheet_identity        sheet 名判定招考群体（北京「面向残疾人职位」用）
+#   attachment_urls       显式指定附件 URL 列表；页面附件链接无扩展名时用
+#                         （浙江/江苏走 /api-gateway/.../download?fileUrl=）
+#   attachment_patterns   自定义 href 正则，匹配非 .xlsx/.xls/.zip 结尾的附件链接
+#   zip_member_pattern    zip 附件里只取文件名含该子串的成员（广东「职位表」）
+#   key_fields            幂等键字段，默认省|年|职位代码|单位|职位名。
+#                         职位代码省内会重号（江苏 2 位、各市独立编号）时必须加 city 等字段
+#
+# 新增省份流程：
+#   1. 打开 list_url 确认公告页能访问、附件是 xlsx/xls/zip
+#   2. 下载一份真实岗位表，核对 Excel 表头再写 field_mapping
+#   3. python scripts/scrape.py --dry-run 验证配置
+#   4. python scripts/scrape.py --export data/<id>.json 抓一份看行数与字段缺失
+#   5. python scripts/import_local.py data/<id>.json 入库
+
+sources:
+  # ------------------------------------------------------------------
+  # 广西壮族自治区 2026 年度考试录用公务员（已按真实表格核对表头）
+  #   公告页: gxpta.com.cn 2026 公务员专题 → 招考公告 t13229.html
+  #   附件:   职位计划表.xlsx，15 个 sheet（区直 + 14 个设区市），表头在第 1 行
+  #   实测:   全区 3358 条，其中"面向残疾人招考"2 条（玉林/来宾，残疾类别与
+  #           等级写在"其他"列，如"三、四级肢体、视力及听力类残疾人"）
+  #   注意:   "职位类别"列（A/B/C 类）决定申论卷型，映射到 essay_subject
+  # ------------------------------------------------------------------
+  - id: gx-rsks-2026
+    province_code: "450000"
+    name: 广西人事考试网·2026年度公务员
+    kind: announcement
+    enabled: true
+    year: 2026
+    category: 0
+    list_url: https://www.gxpta.com.cn/ksxm/gwyzlks/gx2026ndkslygwyxdszt/2026ngwygg/t13229.html
+    field_mapping:
+      招录机关: recruit_unit          # 招录机关（单位名称）
+      机构层级: unit_level            # 自治区级/市级/县级/乡镇级
+      系统属性: position_nature       # 党群/公安等系统
+      职位名称: position_name
+      职位代码: position_code
+      职位类别: essay_subject         # A/B/C 类 → 申论卷型
+      职位招考对象: candidate_identity  # 不限/面向残疾人招考/面向高校毕业生退役军人招考
+      招考人数: quota                 # 整数
+      职位简介: description
+      专业（学科）类别: major          # 注意全角括号
+      学历: education
+      学位: degree
+      年龄: max_age
+      是否要求具有2年以上基层工作经历: grassroots_exp
+      是否要求应届毕业生: fresh_grad
+      其他: other_requirements        # 含性别要求、证书要求、残疾人类别等级等关键信息
+      资格审查咨询电话1: phone1
+      资格审查咨询电话2: phone2
+    # sheet 名（区直/南宁/柳州…）会写入 city 字段，无需在此配置
+
+  # ------------------------------------------------------------------
+  # 北京市 2027 年度考试录用公务员（2026-11-09 发布）
+  #   公告页: 首都之窗 → 公务员招考（原文来源于北京组工）
+  #   附件:   招考简章 .xls，5 个 sheet：普通 / 退役大学生士兵 /
+  #           乡村振兴协理员等基层项目 / 面向残疾人 / 特殊职位
+  #   注意:   表头在第 2 行（首行是标题行）→ header_row: 1
+  #           sheet 是「职位类别」不是城市 → sheet_as_city: false
+  #           没有「招考对象」列，群体口径写在 sheet 名 → sheet_identity: true
+  #           面向残疾人职位 14 条，残疾类别与等级写在「其它条件」列
+  # ------------------------------------------------------------------
+  - id: bj-rsks-2027
+    province_code: "110000"
+    name: 北京市人事考试通用平台·2027年度公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.beijing.gov.cn/gongkai/rsxx/gwyzk/202611/t20261109_4938196.html
+    announcement_title: 北京市各级机关2027年度考试录用公务员公告
+    header_row: 1
+    sheet_as_city: false
+    sheet_identity: true
+    field_mapping:
+      职位代码: position_code
+      单位名称: recruit_unit
+      用人部门: region_dept
+      机构性质: position_nature
+      职位名称: position_name
+      职位层级: unit_level
+      职位类别: position_type
+      职位简介: description
+      招考人数: quota
+      学历要求: education
+      学位要求: degree
+      专业要求: major
+      政治面貌: political_status
+      其它条件: other_requirements        # 含残疾类别等级、资格证书等硬条件
+      面试人数与计划录用人数的比例: interview_ratio
+      基层工作经历最低年限: grassroots_exp
+      考生咨询电话: phone1
+
+  # ------------------------------------------------------------------
+  # 广东省 2027 年度考试录用公务员（2026-10-30 发布，招 10293 名）
+  #   公告页: 广东组织工作网 → 通知公告
+  #   附件:   公告附件.zip（内含 5 个文件），需用 zip_member_pattern 只取「职位表」
+  #   职位表: 6 个 sheet：县以上机关 / 乡镇机关 / 公安 / 法院 / 检察院 / 监狱戒毒
+  #   注意:   「县以上机关」sheet 前两行都是标题，其余 sheet 只有一行标题，
+  #           表头行不统一 → 由 _detect_header_row 自动定位，无需配置 header_row
+  #           专业要求分「研究生/本科/大专」三列，全部映射到 major（自动用；拼接）
+  # ------------------------------------------------------------------
+  - id: gd-rsks-2027
+    province_code: "440000"
+    name: 广东组织工作网·2027年度公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.gdzz.gov.cn/tzgg/content/post_26298.html
+    announcement_title: 广东省2027年考试录用公务员公告
+    zip_member_pattern: 职位表
+    sheet_as_city: false
+    field_mapping:
+      招考单位: recruit_unit
+      招考职位: position_name
+      职位代码: position_code
+      职位简介: description
+      职位类型: position_type
+      录用人数: quota
+      学历: education
+      学位: degree
+      研究生专业名称及代码: major
+      本科专业名称及代码: major
+      大专专业名称及代码: major
+      是否要求2年以上基层工作经历: grassroots_exp
+      是否限应届毕业生报考: fresh_grad
+      其他要求: other_requirements         # 残疾类别与等级写在这里
+      考区: city
+
+  # ------------------------------------------------------------------
+  # 浙江省 2027 年度考试录用公务员（2026-11-05 发布，招 4511 名）
+  #   公告页: 临安区政府转载页（省录用网 www.zjks.gov.cn 本地访问被拦）
+  #   附件:   职位一览表 .xlsx，但页面用 /api-gateway/.../download?fileUrl= 包装，
+  #           路径无扩展名 → 用 attachment_patterns 匹配
+  #   职位表: 3 个 sheet：综合管理类 / 行政执法类 / 专业技术类（是职位属性，非城市）
+  # ------------------------------------------------------------------
+  - id: zj-rsks-2027
+    province_code: "330000"
+    name: 浙江省公务员考试录用网·2027年度公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.linan.gov.cn/col/col1229486043/art/2026/art_c84ebb59f0a9429ba3f8bb0abb0a41f6.html
+    announcement_title: 浙江省各级机关单位2027年度考试录用公务员公告
+    attachment_patterns:
+      - "/document/download"
+    sheet_as_city: false
+    field_mapping:
+      招录机关名称: recruit_unit
+      职位代码: position_code
+      职位名称: position_name
+      职位属性: position_type
+      职位大类: essay_subject
+      职位小类: position_nature
+      考录人数: quota
+      咨询电话: phone1
+      职位简介: description
+      学历要求: education
+      学位要求: degree
+      现有身份要求: candidate_identity
+      政治面貌要求: political_status
+      年龄要求: max_age
+      专业要求: major
+      备注: other_requirements
+
+  # ------------------------------------------------------------------
+  # 天津市 2027 年度考试录用公务员（2026-11-02 发布，招 1515 名，含 2 个残疾人定向岗）
+  #   公告页: 天津政务网 → 招考
+  #   附件:   职位表 .xlsx（单 sheet，表头在第 2 行，首行是标题）
+  #   注意:   残疾要求写作「肢体或听力残疾四级」这种极简形式，无「报考」字样，
+  #           打标规则已针对这种写法补充判据
+  # ------------------------------------------------------------------
+  - id: tj-rsks-2027
+    province_code: "120000"
+    name: 天津市公务员考试录用服务平台·2027年度公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.tj.gov.cn/zwgk/zfxxgkzl/fdzdgknr/zkly/zk/202611/t20261103_7649185.html
+    announcement_title: 天津市2027年度考试录用公务员公告
+    sheet_as_city: false
+    field_mapping:
+      代码: position_code
+      招考单位: recruit_unit
+      招考部门: region_dept
+      招考职位: position_name
+      职位简介: description
+      招考人数: quota
+      学历学位: education
+      专业: major
+      招考对象: candidate_identity
+      政治面貌: political_status
+      年龄: max_age
+      工作经历要求: grassroots_exp
+      其他资格条件: other_requirements     # 残疾类别与等级在这里
+      公共科目类型: essay_subject
+      职位性质: position_nature
+      职位类别: position_type
+      职位层级: unit_level
+      招考部门电话（区号022）: phone1
+
+  # ------------------------------------------------------------------
+  # 四川省 2027 年度省级机关（2026-10-29 发布，省级 61 名）
+  #   公告页: 四川人事考试网 → 新闻详情
+  #   附件:   页面用 /front/download-<uuid> 提供，无扩展名 → attachment_urls 显式指定
+  #   注意:   四川省考按「系统 + 21 个市州」分别发布，这份只是省级机关，
+  #           其余系统（监狱/法检/定向/选调）与市州需各自加条目
+  # ------------------------------------------------------------------
+  - id: sc-rsks-2027-prov
+    province_code: "510000"
+    name: 四川人事考试网·2027年度省级机关公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/3b4494f2ae4c4cf1a7c793ddde3a4c9f?t=56
+    announcement_title: 四川省2027年度省级机关及其直属机构公开考试录用公务员公告
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-1c508f3105014993a0cb61cfdb68201b
+    sheet_as_city: false
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      考录对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      其他要求: other_requirements
+      咨询电话: phone1
+
+  # ------------------------------------------------------------------
+  # 江苏省 2027 年度考试录用公务员（2026-10-30 发布，招 8149 名）
+  #   公告页: 省委组织部 → 2027 考录专题 → 职位简介表
+  #   附件:   3 份（api-gateway 包装链接，路径无扩展名 → attachment_urls 显式指定）
+  #           ① 省级机关职位简介表 .xls
+  #           ② 各市职位简介表 .zip（内含 13 个市的 .xls）
+  #           ③ 垂管单位职位简介表 .zip
+  #   注意:   省级表头在第 3 行（前两行是合并单元格标题）→ 自动定位
+  #           列名带全角空格（「隶  属  关  系」），_norm_key 会去掉空白
+  #           各市表以 sheet 名区分城市，sheet_as_city 保持默认 true
+  # ------------------------------------------------------------------
+  - id: js-rsks-2027
+    province_code: "320000"
+    name: 江苏省委组织部·2027年度公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.jszzb.gov.cn/2027ndkslygwyzt/zkgg/art/2026/art_d8bec4f4afcf4cbaa5842b8b611e504f.html
+    announcement_title: 江苏省2027年度考试录用公务员公告
+    # 江苏职位代码只有 2 位且各市独立编号；同一代码下还按专业方向分列多行，
+    # 因此幂等键要带上 城市 + 单位代码 + 专业
+    key_fields: [province_code, year, city, position_code, region_dept, recruit_unit, position_name, major]
+    attachment_urls:
+      - https://www.jszzb.gov.cn/api-gateway/jpaas-web-server/front/document/download?fileUrl=YW5UzzlvCwcM%2FNHHX%2FtT6NIl%2F%2Fx1E3zQDGt6b1FE3afA2hn0Yiof9z6OdCrD4QQCozvml2%2FfJ9MLaJkGWa7AhHLfclEyrjk5n0vcTW4jzg31rL1llV0GfydcuyykgcUsWB7uzU6ABiUEx3DigbH4LjaLGm94sv2ik8Mmc1VVT%2BA%3D&fileName=%E6%B1%9F%E8%8B%8F%E7%9C%812027%E5%B9%B4%E5%BA%A6%E8%80%83%E8%AF%95%E5%BD%95%E7%94%A8%E5%85%AC%E5%8A%A1%E5%91%98%E7%9C%81%E7%BA%A7%E6%9C%BA%E5%85%B3%E8%81%8C%E4%BD%8D%E7%AE%80%E4%BB%8B%E8%A1%A8.xls
+      - https://www.jszzb.gov.cn/api-gateway/jpaas-web-server/front/document/download?fileUrl=YW5UzzlvCwcM%2FNHHX%2FtT6NIl%2F%2Fx1E3zQDGt6b1FE3afA2hn0Yiof9z6OdCrD4QQCnmwwv6BAgyF7TgCx%2FJx5e8UZ1GGObhJu5eTS4cEGgAafBHdtTyrcu0S4BodSjJPFWB7uzU6ABiUEx3DigbH4LjaLGm94sv2ik8Mmc1VVT%2BA%3D&fileName=%E6%B1%9F%E8%8B%8F%E7%9C%812027%E5%B9%B4%E5%BA%A6%E8%80%83%E8%AF%95%E5%BD%95%E7%94%A8%E5%85%AC%E5%8A%A1%E5%91%98%E5%90%84%E5%B8%82%E8%81%8C%E4%BD%8D%E7%AE%80%E4%BB%8B%E8%A1%A8.zip
+      - https://www.jszzb.gov.cn/api-gateway/jpaas-web-server/front/document/download?fileUrl=YW5UzzlvCwcM%2FNHHX%2FtT6NIl%2F%2Fx1E3zQDGt6b1FE3afA2hn0Yiof9z6OdCrD4QQC8uowtinoSVdNLzCTwP2n3w%2FOn8eCoI4OeJMQSULJISOfBHdtTyrcu0S4BodSjJPFWB7uzU6ABiUEx3DigbH4LjaLGm94sv2ik8Mmc1VVT%2BA%3D&fileName=%E6%B1%9F%E8%8B%8F%E7%9C%812027%E5%B9%B4%E5%BA%A6%E8%80%83%E8%AF%95%E5%BD%95%E7%94%A8%E5%85%AC%E5%8A%A1%E5%91%98%E5%9E%82%E7%AE%A1%E5%8D%95%E4%BD%8D%E8%81%8C%E4%BD%8D%E7%AE%80%E4%BB%8B%E8%A1%A8.zip
+    field_mapping:
+      单位名称: recruit_unit
+      单位代码: region_dept
+      职位代码: position_code
+      职位名称: position_name
+      职位简介: description
+      考试类别: essay_subject
+      招考人数: quota
+      学历: education
+      专业: major
+      其它: other_requirements
+
+  # ==================================================================
+  # 上海市 2027 年度考试录用公务员（2026-10-30 发布）
+  #   站点:   shacs.gov.cn 是 Vue 单页应用，页面 HTML 里没有正文和附件。
+  #           数据来自 JSON 接口，base = https://shacs.gov.cn/gwyj/api
+  #             /gwy-column-section.json?listChild=true   → 栏目（440 = 2027 专题）
+  #             /child-section-and-news.json?sectionId=440 → 专题下各栏目文章
+  #             /show-news.json?id=1465                   → 文章详情，带 attIds/attNames
+  #           附件下载: https://shacs.gov.cn/gwyj/api/files/fetch?fid=<attId>
+  #           该链接无扩展名（parse_attachment 按文件头识别，已支持）
+  #   附件:   招考简章 .xls，9 个 sheet（公务员/参公/行政执法/服务基层项目/
+  #           市外办非通用语/公安机关特警/残疾人/警务技术类人民警察/
+  #           高校毕业生退役士兵），每张表前两行都是标题与说明 → 表头在第 3 行
+  #   注意:   sheet 是「招录类别」不是城市 → sheet_as_city: false
+  #           三张专项表的「招考对象」列写的是「不限」，群体口径只体现在
+  #           sheet 名上 → 用 sheet_identity_map 显式指定
+  #           专业要求分「本科/研究生」两列 → 都映射到 major（自动用；拼接）
+  #           直辖市无下级城市，city 留空（与北京/天津一致）
+  # ==================================================================
+  - id: sh-rsks-2027
+    province_code: "310000"
+    name: 上海市公务员局·2027年度公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://shacs.gov.cn/recruits/440
+    announcement_title: 上海市2027年度考试录用公务员公告
+    sheet_as_city: false
+    sheet_identity_map:
+      残疾人: 残疾人专项招录
+      服务基层项目: 服务基层项目人员
+      高校毕业生退役士兵: 高校毕业生退役士兵
+    attachment_urls:
+      - https://shacs.gov.cn/gwyj/api/files/fetch?fid=93e10a70-fb5a-4315-af04-623866145d89
+    field_mapping:
+      招录机关: recruit_unit
+      用人单位: region_dept
+      职位名称: position_name
+      职位代码: position_code
+      职位简介: description
+      招录人数: quota
+      招考对象: candidate_identity
+      基层工作经历: grassroots_exp
+      本科专业要求: major
+      研究生专业要求: major
+      专业类别: position_type
+      学历要求: education
+      学位要求: degree
+      政治面貌: political_status
+      其他条件: other_requirements      # 残疾类别等级等硬条件都在这里
+      备注: other_requirements
+
+  # ==================================================================
+  # 四川省 2027 年度全省职位表（2026-10-29 起陆续发布，46 份公告）
+  #   省级机关已在上方单独配置；以下 45 个源覆盖：
+  #     21 市州普通公务员 / 20 市州人民警察 / 法院检察院 / 公安特警
+  #     / 监狱戒毒 / 定向招考
+  #   共同点：表头之前的第 1 行是「附件1」「招考职位由招录机关编报…」说明行，
+  #           表头实际在第 2-3 行 → 靠 _detect_header_row 自动定位
+  #           每份表都是单 sheet（Sheet0/Sheet1/法院系统…），不是城市
+  #           → sheet_as_city: false，城市取表内「地区、部门」列
+  #   职位编码 8 位、省内唯一（前 2 位为地区/系统代码），默认幂等键够用
+  # ==================================================================
+  # 成都公务员（2 份职位表）
+  - id: sc-2027-cd
+    province_code: "510000"
+    name: 四川人事考试网·成都公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/13e6dba5317548ad9686b36da849757e?sv=1
+    announcement_title: 中共成都市委组织部关于成都市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-ee6f112e406d4c3d8a442362f94607f5
+      - https://www.scpta.com.cn/front/download-033ba514612a4f10bbfe1cd3226b96e0
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 自贡公务员（2 份职位表）
+  - id: sc-2027-zg
+    province_code: "510000"
+    name: 四川人事考试网·自贡公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/dfee7a2844404e71906e8ca4c7edb29a?sv=1
+    announcement_title: 中共自贡市委组织部关于自贡市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-fa1422345e2e495a8f18cb8ceb1f2b53
+      - https://www.scpta.com.cn/front/download-9e2d80ca50c547579d8d18f5e38c3278
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 攀枝花公务员（2 份职位表）
+  - id: sc-2027-pzh
+    province_code: "510000"
+    name: 四川人事考试网·攀枝花公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/9ccaf64b6d374586958d6788945d0f38?sv=1
+    announcement_title: 中共攀枝花市委组织部关于攀枝花市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-6870773a84fe47dd8339da230ba10908
+      - https://www.scpta.com.cn/front/download-05ae60a101814cfba51d3cfc8389e179
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 泸州公务员（2 份职位表）
+  - id: sc-2027-lz
+    province_code: "510000"
+    name: 四川人事考试网·泸州公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/613a44e44483497bbf25c1a5f551a4c6?sv=1
+    announcement_title: 中共泸州市委组织部关于泸州市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-0a14728128a9489f88746213b1152952
+      - https://www.scpta.com.cn/front/download-9b305e1a28d74c74ae52abfa40f005cc
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 德阳公务员（2 份职位表）
+  - id: sc-2027-dy
+    province_code: "510000"
+    name: 四川人事考试网·德阳公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/0426db44864b408989fde1297c716f48?sv=1
+    announcement_title: 中共德阳市委组织部关于德阳市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-0e99c1f29fd44bcda4d816f5f89f5e01
+      - https://www.scpta.com.cn/front/download-58258a2f493548258ea724b05b71f025
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 绵阳公务员（2 份职位表）
+  - id: sc-2027-my
+    province_code: "510000"
+    name: 四川人事考试网·绵阳公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/49f1b1d208b14ea0a94df8f9410d11f4?sv=1
+    announcement_title: 中共绵阳市委组织部关于绵阳市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-aa5ca5f0632b482590dcf6020142014c
+      - https://www.scpta.com.cn/front/download-4f58b401c1af4cec92355d78259ddc90
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 广元公务员（2 份职位表）
+  - id: sc-2027-gy
+    province_code: "510000"
+    name: 四川人事考试网·广元公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/c6bada904f70442cb1ced5b0b65a22b9?sv=1
+    announcement_title: 中共广元市委组织部关于广元市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-756cae37581a4f54a1165c01003d8be0
+      - https://www.scpta.com.cn/front/download-4bbcedebb65548e6a3dc5a986fbd6236
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 遂宁公务员（2 份职位表）
+  - id: sc-2027-sn
+    province_code: "510000"
+    name: 四川人事考试网·遂宁公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/4eeb0edf22e547f899f50f60e86a3168?sv=1
+    announcement_title: 中共遂宁市委组织部关于遂宁市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-898765dc64744aca9abdeb8bdb7b795a
+      - https://www.scpta.com.cn/front/download-c7889f525c904079b31478316691945a
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 内江公务员（1 份职位表）
+  - id: sc-2027-nj
+    province_code: "510000"
+    name: 四川人事考试网·内江公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/2a8b144b5209421288fd3860ec501a20?sv=1
+    announcement_title: 中共内江市委组织部关于内江市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-d723c0143e1d46f386becd7837afc411
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 乐山公务员（2 份职位表）
+  - id: sc-2027-ls
+    province_code: "510000"
+    name: 四川人事考试网·乐山公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/9d986e8b751b4c3d9aa6b212ffb36101?sv=1
+    announcement_title: 中共乐山市委组织部关于乐山市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-1830d6e0278945bab1a46f097e5d8920
+      - https://www.scpta.com.cn/front/download-0d79f0cdce47483c89521882f1302f7a
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 南充公务员（2 份职位表）
+  - id: sc-2027-nc
+    province_code: "510000"
+    name: 四川人事考试网·南充公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/d42e53c8581b416283157836ff8ac40d?sv=1
+    announcement_title: 中共南充市委组织部关于南充市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-a1fdcb5fed97456bb2c29afc33adfd71
+      - https://www.scpta.com.cn/front/download-854acd7a248444e6bd3241827bd6bff1
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 宜宾公务员（2 份职位表）
+  - id: sc-2027-yb
+    province_code: "510000"
+    name: 四川人事考试网·宜宾公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/ecffe06aa6a4438aa8f8de775bc44f6d?sv=1
+    announcement_title: 中共宜宾市委组织部关于宜宾市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-622074a8ce5a47668b32b1a0b3adfbac
+      - https://www.scpta.com.cn/front/download-c80834d2f6f746f584df754e63ad9fff
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 广安公务员（2 份职位表）
+  - id: sc-2027-ga
+    province_code: "510000"
+    name: 四川人事考试网·广安公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/535421ffdaf64a4ba79edca9fb712a7b?sv=1
+    announcement_title: 中共广安市委组织部关于广安市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-18837ac94c6243e3a66663079c694cd6
+      - https://www.scpta.com.cn/front/download-a58467ba5b5848f297abce76c6b403f7
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 达州公务员（2 份职位表）
+  - id: sc-2027-dz
+    province_code: "510000"
+    name: 四川人事考试网·达州公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/4a35970dd922473f9590e54321d9d993?sv=1
+    announcement_title: 中共达州市委组织部关于达州市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-79ed363b479940028607c622243bd0da
+      - https://www.scpta.com.cn/front/download-18249490138d4c11ae0f3513760f35d3
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 巴中公务员（2 份职位表）
+  - id: sc-2027-bz
+    province_code: "510000"
+    name: 四川人事考试网·巴中公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/baa46ee4194b45179478feec73874676?sv=1
+    announcement_title: 中共巴中市委组织部关于巴中市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-ff4a7b9a34664997ab9ee6ae64261510
+      - https://www.scpta.com.cn/front/download-6429792f6896463db7a35dd12b9b8997
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 雅安公务员（2 份职位表）
+  - id: sc-2027-ya
+    province_code: "510000"
+    name: 四川人事考试网·雅安公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/0106f2152d124571988314694522ba6c?sv=1
+    announcement_title: 中共雅安市委组织部关于雅安市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-c67ca810423f4ec7b848207616db6e4e
+      - https://www.scpta.com.cn/front/download-85e5eb2c522d4b3985eb7ae47d0bed79
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 眉山公务员（2 份职位表）
+  - id: sc-2027-ms
+    province_code: "510000"
+    name: 四川人事考试网·眉山公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/68bb37a434d24cf6b48f010000927e83?sv=1
+    announcement_title: 中共眉山市委组织部关于眉山市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-b497a97869204b5c860e8eaf16eb52b0
+      - https://www.scpta.com.cn/front/download-a6102bea5ee14728b2d306bf4fde9938
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 资阳公务员（2 份职位表）
+  - id: sc-2027-zy
+    province_code: "510000"
+    name: 四川人事考试网·资阳公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/356fcf50ffc749c08dc3f48085e22d75?sv=1
+    announcement_title: 中共资阳市委组织部关于资阳市2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-cdc0fd2bf75d4765b048be71a5555ebc
+      - https://www.scpta.com.cn/front/download-e8f3fdfb28db46cd8c8671a83d427add
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 阿坝公务员（2 份职位表）
+  - id: sc-2027-ab
+    province_code: "510000"
+    name: 四川人事考试网·阿坝公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/b41c9f629f104d5e9488634048f2bd1b?sv=1
+    announcement_title: 中共阿坝州委组织部关于阿坝州2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-47c08d5d73794cc9b1d4d1a533f67926
+      - https://www.scpta.com.cn/front/download-701cf59e2ff64a11b7c3b2a4a27ff195
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 甘孜公务员（2 份职位表）
+  - id: sc-2027-gz
+    province_code: "510000"
+    name: 四川人事考试网·甘孜公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/ae90eb22d8be42b1ae61ed5e887b0861?sv=1
+    announcement_title: 中共甘孜州委组织部关于甘孜州2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-db6a50fcd52d45b7ac0a7da63a8f4089
+      - https://www.scpta.com.cn/front/download-0b7a89aad35946039a4220e18826c0c7
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 凉山公务员（2 份职位表）
+  - id: sc-2027-lsz
+    province_code: "510000"
+    name: 四川人事考试网·凉山公务员
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/969259eed6624729a0523f83028270e9?sv=1
+    announcement_title: 中共凉山州委组织部关于凉山州2027年度公开考试录用公务员（参照管理工作人员）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-8f34b54b5a8340af9f84478f24b682b1
+      - https://www.scpta.com.cn/front/download-c53072248fc54940a7833f27dbec6219
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 成都人民警察（1 份职位表）
+  - id: sc-2027-cd-police
+    province_code: "510000"
+    name: 四川人事考试网·成都人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/d8935cdf0a3341a693ae53f76a106d18?sv=1
+    announcement_title: 中共成都市委组织部成都市公安局关于成都市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-ff1721a4e78c43f5a907ba1ee3008b67
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 自贡人民警察（1 份职位表）
+  - id: sc-2027-zg-police
+    province_code: "510000"
+    name: 四川人事考试网·自贡人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/f3d99cb2031a468eb9ec654f953dc2b0?sv=1
+    announcement_title: 中共自贡市委组织部自贡市公安局关于自贡市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-70c958c3bd03443c9e2097bcd0e3bfb4
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 攀枝花人民警察（1 份职位表）
+  - id: sc-2027-pzh-police
+    province_code: "510000"
+    name: 四川人事考试网·攀枝花人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/b88aab2a327a4761aaf955634b3a8abb?sv=1
+    announcement_title: 中共攀枝花市委组织部攀枝花市公安局关于攀枝花市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-aed67db173fb4f6899fcb3050c497ed5
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 泸州人民警察（1 份职位表）
+  - id: sc-2027-lz-police
+    province_code: "510000"
+    name: 四川人事考试网·泸州人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/a8c05a08deb94d1994655dd115d39d21?sv=1
+    announcement_title: 中共泸州市委组织部泸州市公安局关于泸州市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-d16c77cdc06042afb59efd89253ba644
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 德阳人民警察（1 份职位表）
+  - id: sc-2027-dy-police
+    province_code: "510000"
+    name: 四川人事考试网·德阳人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/bec8f02468c24d85afe8882fceea4e2b?sv=1
+    announcement_title: 中共德阳市委组织部德阳市公安局关于德阳市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-008ae687a894450e862d228a4c7cf706
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 绵阳人民警察（1 份职位表）
+  - id: sc-2027-my-police
+    province_code: "510000"
+    name: 四川人事考试网·绵阳人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/6d7b5fdd86a54a188cea2d234582d2cc?sv=1
+    announcement_title: 中共绵阳市委组织部绵阳市公安局关于绵阳市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-323c9a2f5ed0428aa13ff12bf9a5dcf2
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 广元人民警察（1 份职位表）
+  - id: sc-2027-gy-police
+    province_code: "510000"
+    name: 四川人事考试网·广元人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/7f0ee2d6e73e4b93921933a763b70ae7?sv=1
+    announcement_title: 中共广元市委组织部广元市公安局关于广元市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-cd908ca4a7c8470eaa177fffd8e56492
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 遂宁人民警察（1 份职位表）
+  - id: sc-2027-sn-police
+    province_code: "510000"
+    name: 四川人事考试网·遂宁人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/d6a01f81446149a78c92f4c84dbfbc9d?sv=1
+    announcement_title: 中共遂宁市委组织部遂宁市公安局关于遂宁市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-c421b647a0fa4943bdbaa57a7b673011
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 内江人民警察（1 份职位表）
+  - id: sc-2027-nj-police
+    province_code: "510000"
+    name: 四川人事考试网·内江人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/3ea3c7494ee24a5dac3a8be9630409f7?sv=1
+    announcement_title: 中共内江市委组织部内江市公安局关于内江市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-672ae5e747bb46a4a38d422a4e454aa5
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 乐山人民警察（1 份职位表）
+  - id: sc-2027-ls-police
+    province_code: "510000"
+    name: 四川人事考试网·乐山人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/280b5b9ce9514f92bbe9b1053eb2c637?sv=1
+    announcement_title: 中共乐山市委组织部乐山市公安局关于乐山市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-b90e9c79b0fc43b3aa418d23b5dd8f21
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 南充人民警察（1 份职位表）
+  - id: sc-2027-nc-police
+    province_code: "510000"
+    name: 四川人事考试网·南充人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/997e4afd5b6b430a91b8dbb51d4ba5bf?sv=1
+    announcement_title: 中共南充市委组织部南充市公安局关于南充市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-953bde1ecfb248b4a55f37e7af0c4988
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 宜宾人民警察（1 份职位表）
+  - id: sc-2027-yb-police
+    province_code: "510000"
+    name: 四川人事考试网·宜宾人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/98477e5f9a13415ab0cb80f27a022843?sv=1
+    announcement_title: 中共宜宾市委组织部宜宾市公安局关于宜宾市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-65d9ddc49ad8466f8b03c902c4b82577
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 广安人民警察（1 份职位表）
+  - id: sc-2027-ga-police
+    province_code: "510000"
+    name: 四川人事考试网·广安人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/f480e0bd919f4472924a998f68896be5?sv=1
+    announcement_title: 中共广安市委组织部广安市公安局关于广安市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-1043c483316f408eb4e91544af6583c7
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 达州人民警察（1 份职位表）
+  - id: sc-2027-dz-police
+    province_code: "510000"
+    name: 四川人事考试网·达州人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/17c57cd187b648bd8b8c04e5ec5e8c04?sv=1
+    announcement_title: 中共达州市委组织部达州市公安局关于达州市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-b5ff275b74bd48878219f1b017d1ae29
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 巴中人民警察（1 份职位表）
+  - id: sc-2027-bz-police
+    province_code: "510000"
+    name: 四川人事考试网·巴中人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/f441e6f1bb6f417587ae6c7a2dddaaec?sv=1
+    announcement_title: 中共巴中市委组织部巴中市公安局关于巴中市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-7b1084a167404cf0a78575e5e2ef6019
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 雅安人民警察（1 份职位表）
+  - id: sc-2027-ya-police
+    province_code: "510000"
+    name: 四川人事考试网·雅安人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/ad7c409a849845449d2fc898b7d53155?sv=1
+    announcement_title: 中共雅安市委组织部雅安市公安局关于雅安市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-b97abbdf61ce4f4581e6903cb2891aa9
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 资阳人民警察（1 份职位表）
+  - id: sc-2027-zy-police
+    province_code: "510000"
+    name: 四川人事考试网·资阳人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/5bd0061825a7474186e7d51df510c441?sv=1
+    announcement_title: 中共资阳市委组织部资阳市公安局关于资阳市2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-92ee0ab568bf4ba68e36e7622354129d
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 阿坝人民警察（1 份职位表）
+  - id: sc-2027-ab-police
+    province_code: "510000"
+    name: 四川人事考试网·阿坝人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/b9dbd236256549aab0047e6db5d85693?sv=1
+    announcement_title: 中共阿坝州委组织部阿坝州公安局关于阿坝州2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-edf8c58b72ab40e7aceea183c8addaa5
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 甘孜人民警察（1 份职位表）
+  - id: sc-2027-gz-police
+    province_code: "510000"
+    name: 四川人事考试网·甘孜人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/7bff7cb95318403d91d7f4e5fe709550?sv=1
+    announcement_title: 中共甘孜州委组织部甘孜州公安局关于甘孜州2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-ba1503e46e6c4edc9a28636a66a07d6c
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 凉山人民警察（1 份职位表）
+  - id: sc-2027-lsz-police
+    province_code: "510000"
+    name: 四川人事考试网·凉山人民警察
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/52928e29ea214901a7ce72a5475046bf?sv=1
+    announcement_title: 中共凉山州委组织部凉山州公安局关于凉山州2027年度公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-ac6293c3b96a4209ac677a96c9e0d5ae
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 法院检察院（2 份职位表）
+  - id: sc-2027-court
+    province_code: "510000"
+    name: 四川人事考试网·法院检察院
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/bd1a9558a4fd4a1fbf1e4d0814e8b4f3?sv=1
+    announcement_title: 中共四川省委组织部四川省高级人民法院四川省人民检察院关于2027年度四川省法院、检察院系统公开考试录用公务员的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-37400a83e62e4031995cb3dc9d93ed0f
+      - https://www.scpta.com.cn/front/download-1feecbcd759840859c125351a433e961
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 特警（1 份职位表）
+  - id: sc-2027-swat
+    province_code: "510000"
+    name: 四川人事考试网·特警
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/c65c567b3a7f4f6b9de46fedbad3feb3?sv=1
+    announcement_title: 中共四川省委组织部四川省公安厅关于四川省公安机关2027年度公开考试录用特警专业人才的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-bc75c118d0d94715bd82f510675d1994
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 监狱戒毒（1 份职位表）
+  - id: sc-2027-prison
+    province_code: "510000"
+    name: 四川人事考试网·监狱戒毒
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/57d35b25c9f64b3baee5cd376ee8f354?sv=1
+    announcement_title: 中共四川省委组织部四川省司法厅关于2027年度四川省监狱系统、司法行政戒毒系统公开考试录用公务员（人民警察）的公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-bb37e129419645e6b73c20bd345edd3a
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # 定向招考（2 份职位表）
+  - id: sc-2027-targeted
+    province_code: "510000"
+    name: 四川人事考试网·定向招考
+    kind: announcement
+    enabled: true
+    year: 2027
+    category: 0
+    list_url: https://www.scpta.com.cn/front/News/info/202c56a0de0c4f368d7d4a0dfc75b864?sv=1
+    announcement_title: 四川省2027年度从优秀村（社区）干部、优秀工人农民、服务基层项目人员、事业编制人员、退役军人中考试录用公务员（参照管理工作人员）公告
+    sheet_as_city: false
+    attachment_urls:
+      - https://www.scpta.com.cn/front/download-9110aa21f4324a858d319e5fe410bfce
+    field_mapping:
+      职位编码: position_code
+      地区、部门: city
+      市（州）: city
+      招录机关: recruit_unit
+      内设机构: region_dept
+      招录职位: region_dept
+      职位名称: position_name
+      考试类别: essay_subject
+      职位简介: description
+      拟任职务: position_type
+      招录名额: quota
+      录用名额: quota
+      考录范围: domicile
+      考录对象: candidate_identity
+      招考对象: candidate_identity
+      学历: education
+      学位: degree
+      专业: major
+      政治面貌: political_status
+      笔试开考比例: test_ratio
+      面试开考比例: interview_ratio
+      笔试、面试成绩占比: exam_ratio
+      考察比例: inspection_ratio
+      是否开展体能测评: physical_test
+      其他要求: other_requirements
+      备注: other_requirements
+      咨询电话: phone1
+      联系方式: phone1
+
+  # ------------------------------------------------------------------
+  # 手工录入占位（验证流水线连通性用，不产生抓取动作）
+  # ------------------------------------------------------------------
+  - id: manual-demo
+    province_code: "450000"
+    name: 示例手工数据源
+    kind: manual
+    enabled: true
+    year: 2026
+    category: 0

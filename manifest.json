@@ -42,7 +42,8 @@
     },
     "quickapp" : {},
     "mp-weixin" : {
-        "appid" : "wx2043ee3578306661",
+        "appid" : null,
+        "cloudfunctionRoot" : "cloudfunctions/",
         "setting" : {
             "urlCheck" : false,
             "ignoreDevUnusedFiles" : false,
